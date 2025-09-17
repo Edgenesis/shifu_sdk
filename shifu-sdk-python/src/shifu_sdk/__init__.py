@@ -14,6 +14,10 @@ from .core import (
     get_device_protocol,
     log_device_info,
     setup_device_shifu,
+    load_config,
+    get_instructions,
+    get_driver_properties,
+    get_telemetries,
 )
 
 __all__ = [
@@ -32,6 +36,10 @@ __all__ = [
     "get_device_protocol",
     "log_device_info",
     "setup_device_shifu",
+    "load_config",
+    "get_instructions",
+    "get_driver_properties",
+    "get_telemetries",
 ]
 
 __version__ = "0.0.0"

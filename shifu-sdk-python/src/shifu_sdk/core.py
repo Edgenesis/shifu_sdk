@@ -16,6 +16,7 @@ import logging
 from typing import Optional, Callable, Dict, Any
 from enum import Enum
 from kubernetes import client, config
+import yaml
 
 logging.basicConfig(
     level=logging.INFO,
@@ -215,6 +216,134 @@ class DeviceShifu:
         except Exception as e:
             logger.error("Failed to setup DeviceShifu for device %s: %s", self.device_name, e)
             return False
+
+# =============================================================================
+# Config file loaders (mounted ConfigMap files) and normalization
+# =============================================================================
+
+def _read_first_existing_file(base_dir: str, basename: str) -> Optional[str]:
+    """Return path to the first existing file among basename, basename.yaml, basename.yml in base_dir."""
+    candidates = [
+        os.path.join(base_dir, basename),
+        os.path.join(base_dir, f"{basename}.yaml"),
+        os.path.join(base_dir, f"{basename}.yml"),
+    ]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def _safe_load_yaml_file(file_path: str) -> Dict[str, Any]:
+    """Safely load YAML file into a dict. Returns {} on any error or empty content."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)  # type: ignore[no-untyped-call]
+            if data is None:
+                return {}
+            if isinstance(data, dict):
+                return data
+            logger.warning("YAML root in %s is not a mapping. Normalizing to {}.", file_path)
+            return {}
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        logger.error("Failed to read YAML file %s: %s", file_path, e)
+        return {}
+
+
+def load_config(config_dir: str = "/etc/edgedevice/config") -> Dict[str, Any]:
+    """
+    Load config from mounted ConfigMap files (reads from filesystem, not Kubernetes API).
+    
+    When a ConfigMap is mounted into a pod via volumeMounts, the YAML data becomes 
+    files in the filesystem. This function reads those mounted files directly.
+    
+    Args:
+        config_dir: Directory where ConfigMap files are mounted (default: "/etc/edgedevice/config")
+    
+    Returns:
+        Normalized dict with keys:
+        {
+          "driverProperties": {...},
+          "instructions": { "instructions": {...} },
+          "telemetries": {
+            "telemetrySettings": {...},
+            "telemetries": {...}
+          }
+        }
+    """
+    driver_properties_path = _read_first_existing_file(config_dir, "driverProperties")
+    instructions_path = _read_first_existing_file(config_dir, "instructions")
+    telemetries_path = _read_first_existing_file(config_dir, "telemetries")
+
+    raw_driver_properties = _safe_load_yaml_file(driver_properties_path) if driver_properties_path else {}
+    raw_instructions = _safe_load_yaml_file(instructions_path) if instructions_path else {}
+    raw_telemetries = _safe_load_yaml_file(telemetries_path) if telemetries_path else {}
+
+    normalized: Dict[str, Any] = {
+        "driverProperties": raw_driver_properties or {},
+        "instructions": {
+            "instructions": (raw_instructions.get("instructions", {}) if isinstance(raw_instructions, dict) else {})
+        },
+        "telemetries": {
+            "telemetrySettings": (
+                raw_telemetries.get("telemetrySettings", {}) if isinstance(raw_telemetries, dict) else {}
+            ),
+            "telemetries": (
+                raw_telemetries.get("telemetries", {}) if isinstance(raw_telemetries, dict) else {}
+            ),
+        },
+    }
+
+    return normalized
+
+
+
+
+def get_instructions(config_dir: str = "/etc/edgedevice/config") -> Dict[str, Any]:
+    """
+    Get only the instructions from mounted ConfigMap files.
+    Uses the main load_config function internally for consistency.
+    
+    Args:
+        config_dir: Directory where ConfigMap files are mounted (default: "/etc/edgedevice/config")
+    
+    Returns:
+        Dictionary containing the instructions data, or empty dict if not found/error
+    """
+    config = load_config(config_dir)
+    return config.get("instructions", {}).get("instructions", {})
+
+
+def get_driver_properties(config_dir: str = "/etc/edgedevice/config") -> Dict[str, Any]:
+    """
+    Get only the driver properties from mounted ConfigMap files.
+    Uses the main load_config function internally for consistency.
+    
+    Args:
+        config_dir: Directory where ConfigMap files are mounted (default: "/etc/edgedevice/config")
+    
+    Returns:
+        Dictionary containing the driver properties data, or empty dict if not found/error
+    """
+    config = load_config(config_dir)
+    return config.get("driverProperties", {})
+
+
+def get_telemetries(config_dir: str = "/etc/edgedevice/config") -> Dict[str, Any]:
+    """
+    Get only the telemetries from mounted ConfigMap files.
+    Uses the main load_config function internally for consistency.
+    
+    Args:
+        config_dir: Directory where ConfigMap files are mounted (default: "/etc/edgedevice/config")
+    
+    Returns:
+        Dictionary containing the telemetries data, or empty dict if not found/error
+    """
+    config = load_config(config_dir)
+    return config.get("telemetries", {})
 
 # =============================================================================
 # BACKWARD COMPATIBILITY: Global functions (maintains existing API)
