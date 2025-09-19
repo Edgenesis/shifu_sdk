@@ -45,6 +45,185 @@ class EdgeDevicePhase(Enum):
     FAILED = "Failed"
     PENDING = "Pending"
     UNKNOWN = "Unknown"
+# =============================================================================
+# EdgeDevice K8S API: Global functions (maintains existing API)
+# =============================================================================
+
+# Global variables
+k8s_client: Optional[client.CustomObjectsApi] = None
+health_checker: Optional[Callable[[], EdgeDevicePhase]] = None
+edgedevice_namespace: str = ""
+edgedevice_name: str = ""
+SHIFU_API_GROUP = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
+SHIFU_API_VERSION = os.getenv("SHIFU_API_VERSION", "v1alpha1")
+SHIFU_API_PLURAL = os.getenv("SHIFU_API_PLURAL", "edgedevices")
+def init():
+    """Initialize SDK (env + Kubernetes client). [Backward compatibility]"""
+    global k8s_client, edgedevice_namespace, edgedevice_name
+    edgedevice_namespace = os.getenv("EDGEDEVICE_NAMESPACE", "devices")
+    edgedevice_name = os.getenv("EDGEDEVICE_NAME")
+    SHIFU_API_GROUP = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
+    SHIFU_API_VERSION = os.getenv("SHIFU_API_VERSION", "v1alpha1")
+    SHIFU_API_PLURAL = os.getenv("SHIFU_API_PLURAL", "edgedevices")
+    if not edgedevice_name:
+        raise ValueError("EDGEDEVICE_NAME environment variable is required")
+
+    logger.info("Initializing Shifu SDK for EdgeDevice: %s in namespace: %s",
+                edgedevice_name, edgedevice_namespace)
+
+    try:
+        config.load_incluster_config()
+        logger.info("Loaded in-cluster Kubernetes config")
+    except Exception:
+        try:
+            config.load_kube_config()
+            logger.info("Loaded local Kubernetes config")
+        except Exception as e:
+            logger.error("Failed to load Kubernetes config: %s", e)
+            raise
+
+    k8s_client = client.CustomObjectsApi()
+    logger.info("Kubernetes client initialized successfully")
+
+def get_edgedevice() -> Dict[str, Any]:
+    """Get EdgeDevice (raw dict)."""
+    if not k8s_client:
+        init()
+    try:
+        logger.debug("Getting EdgeDevice: %s from namespace: %s", edgedevice_name, edgedevice_namespace)
+        edge_device = k8s_client.get_namespaced_custom_object(
+            group=SHIFU_API_GROUP,
+            version=SHIFU_API_VERSION,
+            namespace=edgedevice_namespace,
+            plural=SHIFU_API_PLURAL,
+            name=edgedevice_name,
+        )
+        logger.debug("Successfully retrieved EdgeDevice")
+        return edge_device
+    except Exception as e:
+        logger.error("Failed to get EdgeDevice %s: %s", edgedevice_name, e)
+        raise
+
+def update_phase(phase: EdgeDevicePhase) -> bool:
+    """Patch status.edgedevicephase to target Phase. Returns True on success; False on failure. """
+    if not k8s_client:
+        init()
+    try:
+        edge_device = get_edgedevice()
+        current_phase = edge_device.get(STATUS_KEY, {}).get(EDGEDEVICE_PHASE_KEY)
+        if current_phase == phase.value:
+            logger.debug("EdgeDevice phase unchanged: %s", phase.value)
+            return True
+
+        logger.info("Updating EdgeDevice phase: %s -> %s", current_phase, phase.value)
+        status_patch = {STATUS_KEY: {EDGEDEVICE_PHASE_KEY: phase.value}}
+
+        k8s_client.patch_namespaced_custom_object(
+            group=SHIFU_API_GROUP,
+            version=SHIFU_API_VERSION,
+            namespace=edgedevice_namespace,
+            plural=SHIFU_API_PLURAL,
+            name=edgedevice_name,
+            body=status_patch,
+        )
+
+        logger.info("Successfully updated EdgeDevice phase to: %s", phase.value)
+        return True
+    except Exception as e:
+        logger.error("Failed to update EdgeDevice phase to %s: %s", phase.value, e)
+        return False
+
+def add_health_checker(checker: Callable[[], EdgeDevicePhase]):
+    """Register health checker that RETURNS a Phase."""
+    global health_checker
+    if not callable(checker):
+        raise ValueError("Health checker must be callable")
+    health_checker = checker
+    logger.info("Health checker registered successfully")
+
+def start(interval: float = 3.0):
+    """Start foreground health loop with configurable interval.
+    
+    Args:
+        interval: Health check interval in seconds (default: 3.0)
+    """
+    if not health_checker:
+        logger.warning("No health checker provided, exiting")
+        return
+
+    logger.info("Starting health monitoring loop (%s-second interval)", interval)
+    health_check_count = 0
+    last_status_log = 0.0
+
+    while True:
+        try:
+            phase = health_checker()
+            health_check_count += 1
+            success = update_phase(phase)
+
+            now = time.time()
+            if (count_triggered := health_check_count % 20 == 0) or now - last_status_log > 60:
+                logger.info("Health Check #%s: Device status = %s", health_check_count, phase.value)
+                last_status_log = now
+                # Reset counter only when count-based logging triggers
+                if count_triggered:
+                    health_check_count = 0  
+
+            if not success:
+                logger.warning("Failed to update EdgeDevice phase, continuing...")
+
+        except Exception as e:
+            logger.error("Health check failed: %s", e)
+            try:
+                update_phase(EdgeDevicePhase.FAILED)
+            except Exception as update_error:
+                logger.error("Failed to set phase to FAILED: %s", update_error)
+        time.sleep(interval)
+
+def get_device_config() -> Dict[str, Any]:
+    """Return EdgeDevice.spec or {}. [Backward compatibility]"""
+    try:
+        edge_device = get_edgedevice()
+        return edge_device.get(SPEC_KEY, {})
+    except Exception as e:
+        logger.error("Failed to get device config: %s", e)
+        return {}
+
+def get_device_address() -> str:
+    """Return spec.address or ''. [Backward compatibility]"""
+    return get_device_config().get(ADDRESS_KEY, "")
+
+def get_device_protocol() -> str:
+    """Return spec.protocol or ''. [Backward compatibility]"""
+    return get_device_config().get(PROTOCOL_KEY, "")
+
+def log_device_info():
+    """Log metadata, address/protocol, and current phase. """
+    try:
+        edge_device = get_edgedevice()
+        meta = edge_device.get(METADATA_KEY, {}) or {}
+        logger.info("EdgeDevice Name: %s", meta.get("name", "unknown"))
+        logger.info("EdgeDevice Namespace: %s", meta.get("namespace", "unknown"))
+        logger.info("Device Address: %s", get_device_address())
+        logger.info("Device Protocol: %s", get_device_protocol())
+        current_phase = edge_device.get(STATUS_KEY, {}).get(EDGEDEVICE_PHASE_KEY, "unknown")
+        logger.info("Current Phase: %s", current_phase)
+    except Exception as e:
+        logger.error("Failed to log device info: %s", e)
+
+def setup_device_shifu(device_name: str, health_check_func: Callable[[], EdgeDevicePhase]):
+    """Set EDGEDEVICE_NAME if unset, init, log info, and register health checker."""
+    try:
+        if not os.getenv("EDGEDEVICE_NAME"):
+            os.environ["EDGEDEVICE_NAME"] = device_name
+        init()
+        log_device_info()
+        add_health_checker(health_check_func)
+        logger.info("DeviceShifu setup completed for %s", device_name)
+        return True
+    except Exception as e:
+        logger.error("Failed to setup DeviceShifu for %s: %s", device_name, e)
+        return False
 
 
 # =============================================================================
@@ -175,175 +354,3 @@ def get_telemetries(config_dir: str = K3S_CONFIGMAP_DIR) -> Dict[str, Any]:
     config = load_config(config_dir)
     return config.get(TELEMETRIES_KEY, {})
 
-# =============================================================================
-# EdgeDevice K8S API: Global functions (maintains existing API)
-# =============================================================================
-
-# Global variables
-k8s_client: Optional[client.CustomObjectsApi] = None
-health_checker: Optional[Callable[[], EdgeDevicePhase]] = None
-edgedevice_namespace: str = ""
-edgedevice_name: str = ""
-shifu_api_group = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
-shifu_api_version = os.getenv("SHIFU_API_VERSION", "v1alpha1")
-shifu_plural = os.getenv("SHIFU_API_PLURAL", "edgedevices")
-def init():
-    """Initialize SDK (env + Kubernetes client). [Backward compatibility]"""
-    global k8s_client, edgedevice_namespace, edgedevice_name
-    edgedevice_namespace = os.getenv("EDGEDEVICE_NAMESPACE", "devices")
-    edgedevice_name = os.getenv("EDGEDEVICE_NAME")
-    shifu_api_group = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
-    shifu_api_version = os.getenv("SHIFU_API_VERSION", "v1alpha1")
-    shifu_plural = os.getenv("SHIFU_API_PLURAL", "edgedevices")
-    if not edgedevice_name:
-        raise ValueError("EDGEDEVICE_NAME environment variable is required")
-
-    logger.info("Initializing Shifu SDK for EdgeDevice: %s in namespace: %s",
-                edgedevice_name, edgedevice_namespace)
-
-    try:
-        config.load_incluster_config()
-        logger.info("Loaded in-cluster Kubernetes config")
-    except Exception:
-        try:
-            config.load_kube_config()
-            logger.info("Loaded local Kubernetes config")
-        except Exception as e:
-            logger.error("Failed to load Kubernetes config: %s", e)
-            raise
-
-    k8s_client = client.CustomObjectsApi()
-    logger.info("Kubernetes client initialized successfully")
-
-def get_edgedevice() -> Dict[str, Any]:
-    """Get EdgeDevice (raw dict)."""
-    if not k8s_client:
-        init()
-    try:
-        logger.debug("Getting EdgeDevice: %s from namespace: %s", edgedevice_name, edgedevice_namespace)
-        edge_device = k8s_client.get_namespaced_custom_object(
-            group=shifu_api_group,
-            version=shifu_api_version,
-            namespace=edgedevice_namespace,
-            plural=shifu_plural,
-            name=edgedevice_name,
-        )
-        logger.debug("Successfully retrieved EdgeDevice")
-        return edge_device
-    except Exception as e:
-        logger.error("Failed to get EdgeDevice %s: %s", edgedevice_name, e)
-        raise
-
-def update_phase(phase: EdgeDevicePhase) -> bool:
-    """Patch status.edgedevicephase to target Phase. Returns True on success; False on failure. """
-    if not k8s_client:
-        init()
-    try:
-        edge_device = get_edgedevice()
-        current_phase = edge_device.get(STATUS_KEY, {}).get(EDGEDEVICE_PHASE_KEY)
-        if current_phase == phase.value:
-            logger.debug("EdgeDevice phase unchanged: %s", phase.value)
-            return True
-
-        logger.info("Updating EdgeDevice phase: %s -> %s", current_phase, phase.value)
-        status_patch = {STATUS_KEY: {EDGEDEVICE_PHASE_KEY: phase.value}}
-
-        k8s_client.patch_namespaced_custom_object(
-            group=shifu_api_group,
-            version=shifu_api_version,
-            namespace=edgedevice_namespace,
-            plural=shifu_plural,
-            name=edgedevice_name,
-            body=status_patch,
-        )
-
-        logger.info("Successfully updated EdgeDevice phase to: %s", phase.value)
-        return True
-    except Exception as e:
-        logger.error("Failed to update EdgeDevice phase to %s: %s", phase.value, e)
-        return False
-
-def add_health_checker(checker: Callable[[], EdgeDevicePhase]):
-    """Register health checker that RETURNS a Phase."""
-    global health_checker
-    if not callable(checker):
-        raise ValueError("Health checker must be callable")
-    health_checker = checker
-    logger.info("Health checker registered successfully")
-
-def start():
-    """Start foreground health loop (3-second interval). """
-    if not health_checker:
-        logger.warning("No health checker provided, exiting")
-        return
-
-    logger.info("Starting health monitoring loop (3-second interval)")
-    health_check_count = 0
-    last_status_log = 0.0
-
-    while True:
-        try:
-            phase = health_checker()
-            health_check_count += 1
-            success = update_phase(phase)
-
-            now = time.time()
-            if health_check_count % 20 == 0 or now - last_status_log > 60:
-                logger.info("Health Check #%s: Device status = %s", health_check_count, phase.value)
-                last_status_log = now
-
-            if not success:
-                logger.warning("Failed to update EdgeDevice phase, continuing...")
-
-        except Exception as e:
-            logger.error("Health check failed: %s", e)
-            try:
-                update_phase(EdgeDevicePhase.FAILED)
-            except Exception as update_error:
-                logger.error("Failed to set phase to FAILED: %s", update_error)
-        time.sleep(3)
-
-def get_device_config() -> Dict[str, Any]:
-    """Return EdgeDevice.spec or {}. [Backward compatibility]"""
-    try:
-        edge_device = get_edgedevice()
-        return edge_device.get(SPEC_KEY, {})
-    except Exception as e:
-        logger.error("Failed to get device config: %s", e)
-        return {}
-
-def get_device_address() -> str:
-    """Return spec.address or ''. [Backward compatibility]"""
-    return get_device_config().get(ADDRESS_KEY, "")
-
-def get_device_protocol() -> str:
-    """Return spec.protocol or ''. [Backward compatibility]"""
-    return get_device_config().get(PROTOCOL_KEY, "")
-
-def log_device_info():
-    """Log metadata, address/protocol, and current phase. """
-    try:
-        edge_device = get_edgedevice()
-        meta = edge_device.get(METADATA_KEY, {}) or {}
-        logger.info("EdgeDevice Name: %s", meta.get("name", "unknown"))
-        logger.info("EdgeDevice Namespace: %s", meta.get("namespace", "unknown"))
-        logger.info("Device Address: %s", get_device_address())
-        logger.info("Device Protocol: %s", get_device_protocol())
-        current_phase = edge_device.get(STATUS_KEY, {}).get(EDGEDEVICE_PHASE_KEY, "unknown")
-        logger.info("Current Phase: %s", current_phase)
-    except Exception as e:
-        logger.error("Failed to log device info: %s", e)
-
-def setup_device_shifu(device_name: str, health_check_func: Callable[[], EdgeDevicePhase]):
-    """Set EDGEDEVICE_NAME if unset, init, log info, and register health checker."""
-    try:
-        if not os.getenv("EDGEDEVICE_NAME"):
-            os.environ["EDGEDEVICE_NAME"] = device_name
-        init()
-        log_device_info()
-        add_health_checker(health_check_func)
-        logger.info("DeviceShifu setup completed for %s", device_name)
-        return True
-    except Exception as e:
-        logger.error("Failed to setup DeviceShifu for %s: %s", device_name, e)
-        return False

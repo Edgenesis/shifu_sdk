@@ -1,8 +1,8 @@
 from .core import (
     EdgeDevicePhase,
-    SHIFU_GROUP,
-    SHIFU_VERSION,
-    SHIFU_PLURAL,
+    SHIFU_API_GROUP,
+    SHIFU_API_VERSION,
+    SHIFU_API_PLURAL,
     # Field constants
     METADATA_KEY,
     SPEC_KEY,

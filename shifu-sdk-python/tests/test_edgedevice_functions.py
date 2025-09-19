@@ -17,9 +17,9 @@ from shifu_sdk import (
     get_edgedevice,
     update_phase,
     add_health_checker,
-    SHIFU_GROUP,
-    SHIFU_VERSION,
-    SHIFU_PLURAL,
+    SHIFU_API_GROUP,
+    SHIFU_API_VERSION,
+    SHIFU_API_PLURAL,
 )
 
 
@@ -55,7 +55,7 @@ def create_fake_edgedevice(device_name: str, namespace: str = "devices") -> Dict
         
         # Define the EdgeDevice manifest
         edge_device_manifest = {
-            "apiVersion": f"{SHIFU_GROUP}/{SHIFU_VERSION}",
+            "apiVersion": f"{SHIFU_API_GROUP}/{SHIFU_API_VERSION}",
             "kind": "EdgeDevice",
             "metadata": {
                 "name": device_name,
@@ -78,10 +78,10 @@ def create_fake_edgedevice(device_name: str, namespace: str = "devices") -> Dict
         
         # Create the EdgeDevice
         created_device = k8s_client.create_namespaced_custom_object(
-            group=SHIFU_GROUP,
-            version=SHIFU_VERSION,
+            group=SHIFU_API_GROUP,
+            version=SHIFU_API_VERSION,
             namespace=namespace,
-            plural=SHIFU_PLURAL,
+            plural=SHIFU_API_PLURAL,
             body=edge_device_manifest
         )
         
@@ -117,10 +117,10 @@ def delete_fake_edgedevice(device_name: str, namespace: str = "devices"):
         
         # Delete the EdgeDevice
         k8s_client.delete_namespaced_custom_object(
-            group=SHIFU_GROUP,
-            version=SHIFU_VERSION,
+            group=SHIFU_API_GROUP,
+            version=SHIFU_API_VERSION,
             namespace=namespace,
-            plural=SHIFU_PLURAL,
+            plural=SHIFU_API_PLURAL,
             name=device_name
         )
         
