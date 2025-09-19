@@ -1,9 +1,20 @@
 from .core import (
     EdgeDevicePhase,
-    DeviceShifu,
     SHIFU_GROUP,
     SHIFU_VERSION,
     SHIFU_PLURAL,
+    # Field constants
+    METADATA_KEY,
+    SPEC_KEY,
+    STATUS_KEY,
+    EDGEDEVICE_PHASE_KEY,
+    ADDRESS_KEY,
+    PROTOCOL_KEY,
+    INSTRUCTIONS_KEY,
+    DRIVER_PROPERTIES_KEY,
+    TELEMETRIES_KEY,
+    TELEMETRY_SETTINGS_KEY,
+    # Functions
     init,
     get_edgedevice,
     update_phase,
@@ -22,10 +33,21 @@ from .core import (
 
 __all__ = [
     "EdgeDevicePhase",
-    "DeviceShifu",
     "SHIFU_GROUP",
     "SHIFU_VERSION", 
     "SHIFU_PLURAL",
+    # Field constants
+    "METADATA_KEY",
+    "SPEC_KEY", 
+    "STATUS_KEY",
+    "EDGEDEVICE_PHASE_KEY",
+    "ADDRESS_KEY",
+    "PROTOCOL_KEY",
+    "INSTRUCTIONS_KEY",
+    "DRIVER_PROPERTIES_KEY",
+    "TELEMETRIES_KEY",
+    "TELEMETRY_SETTINGS_KEY",
+    # Functions
     "init",
     "get_edgedevice",
     "update_phase",
