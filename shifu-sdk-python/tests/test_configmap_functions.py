@@ -23,45 +23,35 @@ def create_test_config_files(test_dir: str):
     """Create test ConfigMap files in the test directory."""
     
     # Create driverProperties file
-    driver_properties_content = '''driverSku: "TAS-WS-R0020"
-driverImage: "test-image:v1.0"
-enabled: true
-timeout: 30'''
+    driver_properties_content = '''driverSku: HTTP Device
+driverImage: http-device:v0.0.1'''
     
     with open(os.path.join(test_dir, "driverProperties"), "w") as f:
         f.write(driver_properties_content)
     
     # Create instructions file
     instructions_content = '''instructions:
-  th:
-    command: "GET /temperature"
-    timeout: 5
-  Temperature:
-    command: "GET /temp"
-    method: "POST"
-  Humidity:
-    command: "GET /humidity"
-    params:
-      unit: "percent"'''
+  status:
+  info:'''
     
     with open(os.path.join(test_dir, "instructions"), "w") as f:
         f.write(instructions_content)
     
     # Create telemetries file
-    telemetries_content = '''telemetries:
-  temperature:
+    telemetries_content = '''telemetrySettings:
+  telemetryUpdateIntervalInMilliseconds: 6000
+  telemetryTimeoutInMilliseconds: 3000
+telemetries:
+  device_health1:
     properties:
-      - name: "value"
-        type: "float"
-        unit: "celsius"
-  humidity:
+      instruction: status
+      pushSettings:
+        telemetryCollectionService: push-endpoint-1
+  device_health2:
     properties:
-      - name: "value"
-        type: "float"
-        unit: "percent"
-telemetrySettings:
-  interval: 10
-  enabled: true'''
+      instruction: status
+      pushSettings:
+        telemetryCollectionService: push-endpoint-2'''
     
     with open(os.path.join(test_dir, "telemetries"), "w") as f:
         f.write(telemetries_content)
@@ -113,9 +103,8 @@ def test_get_driver_properties():
             print(f"  {key}: {value}")
         
         # Verify content
-        assert driver_props.get("driverSku") == "TAS-WS-R0020"
-        assert driver_props.get("enabled") is True
-        assert driver_props.get("timeout") == 30
+        assert driver_props.get("driverSku") == "HTTP Device"
+        assert driver_props.get("driverImage") == "http-device:v0.0.1"
         
         print("✅ get_driver_properties() test passed!")
         return driver_props
@@ -139,11 +128,11 @@ def test_get_instructions():
             print(f"  {key}: {value}")
         
         # Verify content
-        assert "th" in instructions
-        assert "Temperature" in instructions
-        assert "Humidity" in instructions
-        assert instructions["th"]["command"] == "GET /temperature"
-        assert instructions["Humidity"]["params"]["unit"] == "percent"
+        assert "status" in instructions
+        assert "info" in instructions
+        # Note: status and info are empty in this example
+        assert instructions["status"] is None
+        assert instructions["info"] is None
         
         print("✅ get_instructions() test passed!")
         return instructions
@@ -169,10 +158,12 @@ def test_get_telemetries():
         # Verify content
         assert "telemetries" in telemetries
         assert "telemetrySettings" in telemetries
-        assert telemetries["telemetrySettings"]["interval"] == 10
-        assert telemetries["telemetrySettings"]["enabled"] is True
-        assert "temperature" in telemetries["telemetries"]
-        assert "humidity" in telemetries["telemetries"]
+        assert telemetries["telemetrySettings"]["telemetryUpdateIntervalInMilliseconds"] == 6000
+        assert telemetries["telemetrySettings"]["telemetryTimeoutInMilliseconds"] == 3000
+        assert "device_health1" in telemetries["telemetries"]
+        assert "device_health2" in telemetries["telemetries"]
+        assert telemetries["telemetries"]["device_health1"]["properties"]["instruction"] == "status"
+        assert telemetries["telemetries"]["device_health1"]["properties"]["pushSettings"]["telemetryCollectionService"] == "push-endpoint-1"
         
         print("✅ get_telemetries() test passed!")
         return telemetries
