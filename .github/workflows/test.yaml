@@ -24,19 +24,23 @@ jobs:
         python-version: ${{ matrix.python-version }}
     
     - name: Install dependencies
+      working-directory: ./shifu-sdk-python
       run: |
         python -m pip install --upgrade pip
         pip install build pytest
     
     - name: Build the SDK
+      working-directory: ./shifu-sdk-python
       run: |
         python -m build
     
     - name: Install the SDK
+      working-directory: ./shifu-sdk-python
       run: |
         pip install -e .
     
     - name: Run ConfigMap tests
+      working-directory: ./shifu-sdk-python
       run: |
         python tests/test_configmap_functions.py
     
@@ -105,6 +109,7 @@ jobs:
         kubectl wait --for condition=established --timeout=60s crd/edgedevices.shifu.edgenesis.io
     
     - name: Run EdgeDevice tests
+      working-directory: ./shifu-sdk-python
       run: |
         python tests/test_edgedevice_functions.py
       continue-on-error: false
