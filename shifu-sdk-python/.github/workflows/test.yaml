@@ -1,0 +1,117 @@
+name: Build and test Shifu SDK
+
+on:
+  push:
+    branches: [ main, python_sdk ]
+  pull_request:
+    branches: [ main, python_sdk ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build pytest
+    
+    - name: Build the SDK
+      run: |
+        python -m build
+    
+    - name: Install the SDK
+      run: |
+        pip install -e .
+    
+    - name: Run ConfigMap tests
+      run: |
+        python tests/test_configmap_functions.py
+    
+    - name: Set up Kubernetes (for EdgeDevice tests)
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: shifu-test-cluster
+        wait: 30s
+    
+    - name: Verify Kubernetes is running
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+    
+    - name: Create devices namespace
+      run: |
+        kubectl create namespace devices || true
+    
+    - name: Install Shifu CRDs (mock for testing)
+      run: |
+        # Create a basic EdgeDevice CRD for testing
+        cat <<EOF | kubectl apply -f -
+        apiVersion: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        metadata:
+          name: edgedevices.shifu.edgenesis.io
+        spec:
+          group: shifu.edgenesis.io
+          versions:
+            - name: v1alpha1
+              served: true
+              storage: true
+              schema:
+                openAPIV3Schema:
+                  type: object
+                  properties:
+                    spec:
+                      type: object
+                      properties:
+                        sku:
+                          type: string
+                        connection:
+                          type: string
+                        address:
+                          type: string
+                        protocol:
+                          type: string
+                    status:
+                      type: object
+                      properties:
+                        edgedevicephase:
+                          type: string
+              subresources:
+                status: {}
+          scope: Namespaced
+          names:
+            plural: edgedevices
+            singular: edgedevice
+            kind: EdgeDevice
+            shortNames:
+            - ed
+        EOF
+    
+    - name: Wait for CRD to be ready
+      run: |
+        kubectl wait --for condition=established --timeout=60s crd/edgedevices.shifu.edgenesis.io
+    
+    - name: Run EdgeDevice tests
+      run: |
+        python tests/test_edgedevice_functions.py
+      continue-on-error: false
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        kubectl delete namespace devices --ignore-not-found=true
+        kubectl delete crd edgedevices.shifu.edgenesis.io --ignore-not-found=true
+
