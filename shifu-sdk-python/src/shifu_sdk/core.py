@@ -118,28 +118,16 @@ def update_phase(phase: EdgeDevicePhase) -> bool:
         logger.info("Updating EdgeDevice phase: %s -> %s", current_phase, phase.value)
         status_patch = {STATUS_KEY: {EDGEDEVICE_PHASE_KEY: phase.value}}
 
-        # Try to use status subresource first (proper way for CRDs with status subresource)
-        try:
-            k8s_client.patch_namespaced_custom_object_status(
-                group=SHIFU_API_GROUP,
-                version=SHIFU_API_VERSION,
-                namespace=edgedevice_namespace,
-                plural=SHIFU_API_PLURAL,
-                name=edgedevice_name,
-                body=status_patch,
-            )
-            logger.info("Successfully updated EdgeDevice phase to: %s (via status subresource)", phase.value)
-        except AttributeError:
-            # Fallback for older kubernetes client versions
-            k8s_client.patch_namespaced_custom_object(
-                group=SHIFU_API_GROUP,
-                version=SHIFU_API_VERSION,
-                namespace=edgedevice_namespace,
-                plural=SHIFU_API_PLURAL,
-                name=edgedevice_name,
-                body=status_patch,
-            )
-            logger.info("Successfully updated EdgeDevice phase to: %s (via regular patch)", phase.value)
+        k8s_client.patch_namespaced_custom_object(
+            group=SHIFU_API_GROUP,
+            version=SHIFU_API_VERSION,
+            namespace=edgedevice_namespace,
+            plural=SHIFU_API_PLURAL,
+            name=edgedevice_name,
+            body=status_patch,
+        )
+
+        logger.info("Successfully updated EdgeDevice phase to: %s", phase.value)
         return True
     except Exception as e:
         logger.error("Failed to update EdgeDevice phase to %s: %s", phase.value, e)

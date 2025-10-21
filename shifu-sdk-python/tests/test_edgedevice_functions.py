@@ -211,8 +211,8 @@ def test_update_phase():
             success = update_phase(phase)
             assert success, f"Failed to update phase to {phase.value}"
             
-            # Give Kubernetes a moment to process the update
-            time.sleep(0.5)
+            # Give Kubernetes a moment to process the update (longer in CI)
+            time.sleep(1.0)
             
             # Verify the phase was updated
             updated_device = get_edgedevice()
@@ -255,7 +255,7 @@ def test_phase_idempotency():
         success = update_phase(phase)
         assert success
         
-        time.sleep(0.5)
+        time.sleep(1.0)
         
         # Update to same phase multiple times
         print(f"Updating to same phase ({phase.value}) multiple times...")
@@ -320,7 +320,7 @@ def test_health_checker():
             assert current_phase == EdgeDevicePhase.RUNNING.value
             
             print(f"   Health check {i+1}: Device phase = {current_phase} ✅")
-            time.sleep(0.5)
+            time.sleep(1.0)
         
         # Test 2: Health checker that returns FAILED
         print("\n2. Testing health checker that returns FAILED")
@@ -347,7 +347,7 @@ def test_health_checker():
             assert current_phase == EdgeDevicePhase.FAILED.value
             
             print(f"   Health check {i+1}: Device phase = {current_phase} ✅")
-            time.sleep(0.5)
+            time.sleep(1.0)
         
         # Test 3: Dynamic health checker (alternates between states)
         print("\n3. Testing dynamic health checker")
@@ -387,7 +387,7 @@ def test_health_checker():
             assert current_phase == expected_phase.value
             
             print(f"   Dynamic check {i+1}: Expected {expected_phase.value}, got {current_phase} ✅")
-            time.sleep(0.5)
+            time.sleep(1.0)
         
         # Test 4: Health checker with exception handling
         print("\n4. Testing health checker error handling")
