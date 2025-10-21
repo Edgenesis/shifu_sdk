@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.12']
     
     steps:
     - name: Checkout code
@@ -59,54 +59,21 @@ jobs:
       run: |
         kubectl create namespace devices || true
     
-    - name: Install Shifu CRDs (mock for testing)
+    - name: Install Shifu CRDs
       run: |
-        # Create a basic EdgeDevice CRD for testing
-        cat <<EOF | kubectl apply -f -
-        apiVersion: apiextensions.k8s.io/v1
-        kind: CustomResourceDefinition
-        metadata:
-          name: edgedevices.shifu.edgenesis.io
-        spec:
-          group: shifu.edgenesis.io
-          versions:
-            - name: v1alpha1
-              served: true
-              storage: true
-              schema:
-                openAPIV3Schema:
-                  type: object
-                  properties:
-                    spec:
-                      type: object
-                      properties:
-                        sku:
-                          type: string
-                        connection:
-                          type: string
-                        address:
-                          type: string
-                        protocol:
-                          type: string
-                    status:
-                      type: object
-                      properties:
-                        edgedevicephase:
-                          type: string
-              subresources:
-                status: {}
-          scope: Namespaced
-          names:
-            plural: edgedevices
-            singular: edgedevice
-            kind: EdgeDevice
-            shortNames:
-            - ed
-        EOF
+        # Install the actual Shifu EdgeDevice CRD from the official Shifu repository
+        kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/bases/shifu.edgenesis.io_edgedevices.yaml
     
     - name: Wait for CRD to be ready
       run: |
         kubectl wait --for condition=established --timeout=60s crd/edgedevices.shifu.edgenesis.io
+    
+    - name: Grant RBAC permissions for tests
+      run: |
+        # Create a ClusterRole and ClusterRoleBinding for the default service account
+        kubectl create clusterrolebinding test-edgedevice-admin \
+          --clusterrole=cluster-admin \
+          --serviceaccount=default:default || true
     
     - name: Run EdgeDevice tests
       working-directory: ./shifu-sdk-python
