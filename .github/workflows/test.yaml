@@ -62,7 +62,7 @@ jobs:
     - name: Install Shifu CRDs
       run: |
         # Install the actual Shifu EdgeDevice CRD from the official Shifu repository
-        kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/bases/shifu.edgenesis.io_edgedevices.yaml
+        kubectl apply -f https://gitee.com/edgenesis/shifu/raw/v0.81.0/pkg/k8s/crd/install/shifu_install.yml
     
     - name: Wait for CRD to be ready
       run: |
