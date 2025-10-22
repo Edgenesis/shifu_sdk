@@ -20,13 +20,11 @@ Minimal, installable Python SDK that provides both **global functions** and **De
 ### Install
 ```bash
 # Clone and install in editable mode
-git clone <your-repo-url>
-cd shifu-sdk
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -e .
+pip install git+https://github.com/Edgenesis/Shifu_sdk.git#subdirectory=shifu-sdk-python
+ 
 
 #run tests
+git clone <your-repo-url>
 cd tests
 python test_imports.py
 python test_edgedevice_functions.py
