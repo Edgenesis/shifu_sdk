@@ -1,0 +1,89 @@
+name: Build and test Shifu SDK
+
+on:
+  push:
+    branches: [ main, python_sdk ]
+  pull_request:
+    branches: [ main, python_sdk ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      working-directory: ./shifu-sdk-python
+      run: |
+        python -m pip install --upgrade pip
+        pip install build pytest
+    
+    - name: Build the SDK
+      working-directory: ./shifu-sdk-python
+      run: |
+        python -m build
+    
+    - name: Install the SDK
+      working-directory: ./shifu-sdk-python
+      run: |
+        pip install -e .
+    
+    - name: Run ConfigMap tests
+      working-directory: ./shifu-sdk-python
+      run: |
+        python tests/test_configmap_functions.py
+    
+    - name: Set up Kubernetes (for EdgeDevice tests)
+      uses: helm/kind-action@v1
+      with:
+        cluster_name: shifu-test-cluster
+        wait: 30s
+    
+    - name: Verify Kubernetes is running
+      run: |
+        kubectl cluster-info
+        kubectl get nodes
+    
+    - name: Create devices namespace
+      run: |
+        kubectl create namespace devices || true
+    
+    - name: Install Shifu CRDs
+      run: |
+        # Install the actual Shifu EdgeDevice CRD from the official Shifu repository
+        kubectl apply -f https://gitee.com/edgenesis/shifu/raw/v0.81.0/pkg/k8s/crd/install/shifu_install.yml
+    
+    - name: Wait for CRD to be ready
+      run: |
+        kubectl wait --for condition=established --timeout=60s crd/edgedevices.shifu.edgenesis.io
+    
+    - name: Grant RBAC permissions for tests
+      run: |
+        # Create a ClusterRole and ClusterRoleBinding for the default service account
+        kubectl create clusterrolebinding test-edgedevice-admin \
+          --clusterrole=cluster-admin \
+          --serviceaccount=default:default || true
+    
+    - name: Run EdgeDevice tests
+      working-directory: ./shifu-sdk-python
+      run: |
+        python tests/test_edgedevice_functions.py
+      continue-on-error: false
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        kubectl delete namespace devices --ignore-not-found=true
+        kubectl delete crd edgedevices.shifu.edgenesis.io --ignore-not-found=true
+
