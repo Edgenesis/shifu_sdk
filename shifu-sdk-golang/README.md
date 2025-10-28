@@ -664,7 +664,7 @@ func main() {
 
 ## Testing
 
-The SDK includes comprehensive tests with 90%+ coverage.
+The SDK includes comprehensive tests with 78.9% coverage.
 
 ### Run Tests
 ```bash
