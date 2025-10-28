@@ -8,7 +8,7 @@ Minimal, production-ready Go SDK that provides both **global functions** (deprec
 - 🔧 **Kubernetes Integration**: Automatic EdgeDevice status management
 - 📊 **Health Monitoring**: Continuous device health checking and reporting
 - 🎯 **Flexible Configuration**: Support for different namespaces and device types
-- 🧪 **High Test Coverage**: 90%+ test coverage with comprehensive test suite
+- 🧪 **High Test Coverage**: 78.9% test coverage with comprehensive test suite
 - 🚀 **Production Ready**: Used in real-world IoT deployments
 - 🔄 **Backward Compatible**: Legacy global functions still supported (deprecated)
 
