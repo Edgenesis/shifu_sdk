@@ -16,7 +16,11 @@ import logging
 from typing import Optional, Callable, Dict, Any
 from enum import Enum
 from kubernetes import client, config
+from kubernetes.client.rest import ApiException
 import yaml
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +55,8 @@ class EdgeDevicePhase(Enum):
 
 # Global variables
 k8s_client: Optional[client.CustomObjectsApi] = None
+k8s_core_v1_client: Optional[client.CoreV1Api] = None
+k8s_api_client: Optional[client.ApiClient] = None
 health_checker: Optional[Callable[[], EdgeDevicePhase]] = None
 edgedevice_namespace: str = ""
 edgedevice_name: str = ""
@@ -59,7 +65,7 @@ SHIFU_API_VERSION = os.getenv("SHIFU_API_VERSION", "v1alpha1")
 SHIFU_API_PLURAL = os.getenv("SHIFU_API_PLURAL", "edgedevices")
 def init():
     """Initialize SDK (env + Kubernetes client). [Backward compatibility]"""
-    global k8s_client, edgedevice_namespace, edgedevice_name
+    global k8s_client, k8s_core_v1_client, k8s_api_client, edgedevice_namespace, edgedevice_name
     edgedevice_namespace = os.getenv("EDGEDEVICE_NAMESPACE", "devices")
     edgedevice_name = os.getenv("EDGEDEVICE_NAME")
     SHIFU_API_GROUP = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
@@ -82,50 +88,120 @@ def init():
             logger.error("Failed to load Kubernetes config: %s", e)
             raise
 
-    k8s_client = client.CustomObjectsApi()
+    k8s_api_client = client.ApiClient()
+    k8s_client = client.CustomObjectsApi(k8s_api_client)
+    k8s_core_v1_client = client.CoreV1Api(k8s_api_client)
     logger.info("Kubernetes client initialized successfully")
 
-def get_edgedevice() -> Dict[str, Any]:
-    """Get EdgeDevice (raw dict)."""
-    if not k8s_client:
+def _rest_get_edgedevice() -> Dict[str, Any]:
+    """
+    Get EdgeDevice using REST client (matches Go SDK approach).
+    
+    Go SDK equivalent:
+        c.restClient.Get().
+            Namespace(c.edgedeviceNamespace).
+            Resource("edgedevices").
+            Name(c.edgedeviceName).
+            Do(context.TODO()).
+            Into(ed)
+    """
+    if not k8s_api_client:
         init()
+    
+    # Build REST path: /apis/{group}/{version}/namespaces/{namespace}/{plural}/{name}
+    path = f"/apis/{SHIFU_API_GROUP}/{SHIFU_API_VERSION}/namespaces/{edgedevice_namespace}/{SHIFU_API_PLURAL}/{edgedevice_name}"
+    
     try:
-        logger.debug("Getting EdgeDevice: %s from namespace: %s", edgedevice_name, edgedevice_namespace)
-        edge_device = k8s_client.get_namespaced_custom_object(
-            group=SHIFU_API_GROUP,
-            version=SHIFU_API_VERSION,
-            namespace=edgedevice_namespace,
-            plural=SHIFU_API_PLURAL,
-            name=edgedevice_name,
+        logger.debug("REST GET EdgeDevice: %s from namespace: %s", edgedevice_name, edgedevice_namespace)
+        
+        # Make REST call using ApiClient
+        response = k8s_api_client.call_api(
+            resource_path=path,
+            method='GET',
+            auth_settings=['BearerToken'],
+            response_type='object',
+            _return_http_data_only=True,
+            _preload_content=True
         )
-        logger.debug("Successfully retrieved EdgeDevice")
-        return edge_device
+        
+        logger.debug("Successfully retrieved EdgeDevice via REST")
+        return response
+    except ApiException as e:
+        logger.error("REST GET failed for EdgeDevice %s: %s", edgedevice_name, e)
+        raise
     except Exception as e:
         logger.error("Failed to get EdgeDevice %s: %s", edgedevice_name, e)
         raise
 
+
+def get_edgedevice() -> Dict[str, Any]:
+    """Get EdgeDevice (raw dict)."""
+    return _rest_get_edgedevice()
+
+def _rest_put_edgedevice(edge_device: Dict[str, Any]) -> None:
+    """
+    Update EdgeDevice using REST client PUT (matches Go SDK approach).
+    
+    Go SDK equivalent:
+        c.restClient.Put().
+            Namespace(c.edgedeviceNamespace).
+            Resource("edgedevices").
+            Name(c.edgedeviceName).
+            Body(ed).
+            Do(context.TODO())
+    """
+    if not k8s_api_client:
+        init()
+    
+    # Build REST path: /apis/{group}/{version}/namespaces/{namespace}/{plural}/{name}
+    path = f"/apis/{SHIFU_API_GROUP}/{SHIFU_API_VERSION}/namespaces/{edgedevice_namespace}/{SHIFU_API_PLURAL}/{edgedevice_name}"
+    
+    try:
+        logger.debug("REST PUT EdgeDevice: %s in namespace: %s", edgedevice_name, edgedevice_namespace)
+        
+        # Make REST PUT call using ApiClient
+        k8s_api_client.call_api(
+            resource_path=path,
+            method='PUT',
+            body=edge_device,
+            auth_settings=['BearerToken'],
+            response_type='object',
+            _return_http_data_only=True,
+            _preload_content=True
+        )
+        
+        logger.debug("Successfully updated EdgeDevice via REST PUT")
+    except ApiException as e:
+        logger.error("REST PUT failed for EdgeDevice %s: %s", edgedevice_name, e)
+        raise
+    except Exception as e:
+        logger.error("Failed to update EdgeDevice %s: %s", edgedevice_name, e)
+        raise
+
+
 def update_phase(phase: EdgeDevicePhase) -> bool:
-    """Patch status.edgedevicephase to target Phase. Returns True on success; False on failure. """
-    if not k8s_client:
+    """Update EdgeDevice phase. Returns True on success; False on failure. """
+    if not k8s_api_client:
         init()
     try:
+        # Get current EdgeDevice
         edge_device = get_edgedevice()
         current_phase = edge_device.get(STATUS_KEY, {}).get(EDGEDEVICE_PHASE_KEY)
+        
+        # Check if phase unchanged
         if current_phase == phase.value:
             logger.debug("EdgeDevice phase unchanged: %s", phase.value)
             return True
 
         logger.info("Updating EdgeDevice phase: %s -> %s", current_phase, phase.value)
-        status_patch = {STATUS_KEY: {EDGEDEVICE_PHASE_KEY: phase.value}}
-
-        k8s_client.patch_namespaced_custom_object(
-            group=SHIFU_API_GROUP,
-            version=SHIFU_API_VERSION,
-            namespace=edgedevice_namespace,
-            plural=SHIFU_API_PLURAL,
-            name=edgedevice_name,
-            body=status_patch,
-        )
+        
+        # Update the status field
+        if STATUS_KEY not in edge_device:
+            edge_device[STATUS_KEY] = {}
+        edge_device[STATUS_KEY][EDGEDEVICE_PHASE_KEY] = phase.value
+        
+        # PUT the entire EdgeDevice (matching Go SDK)
+        _rest_put_edgedevice(edge_device)
 
         logger.info("Successfully updated EdgeDevice phase to: %s", phase.value)
         return True
