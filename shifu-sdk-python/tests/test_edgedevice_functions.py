@@ -29,7 +29,7 @@ def generate_test_device_name() -> str:
     return f"test-device-{unique_id}"
 
 
-def create_fake_edgedevice(device_name: str, namespace: str = "devices") -> Dict[str, Any]:
+def create_fake_edgedevice(device_name: str, namespace: str = "deviceshifu") -> Dict[str, Any]:
     """Create a fake EdgeDevice in Kubernetes for testing."""
     print(f"Creating fake EdgeDevice: {device_name} in namespace: {namespace}")
     
@@ -98,7 +98,7 @@ def create_fake_edgedevice(device_name: str, namespace: str = "devices") -> Dict
         raise
 
 
-def delete_fake_edgedevice(device_name: str, namespace: str = "devices"):
+def delete_fake_edgedevice(device_name: str, namespace: str = "deviceshifu"):
     """Delete the fake EdgeDevice from Kubernetes."""
     print(f"Deleting EdgeDevice: {device_name} from namespace: {namespace}")
     
@@ -137,7 +137,7 @@ def test_get_edgedevice():
     
     # Generate unique device name
     device_name = generate_test_device_name()
-    namespace = "devices"
+    namespace = "deviceshifu"
     
     try:
         # Create fake EdgeDevice
@@ -183,7 +183,7 @@ def test_update_phase():
     
     # Generate unique device name
     device_name = generate_test_device_name()
-    namespace = "devices"
+    namespace = "deviceshifu"
     
     try:
         # Create fake EdgeDevice
@@ -236,7 +236,7 @@ def test_phase_idempotency():
     
     # Generate unique device name
     device_name = generate_test_device_name()
-    namespace = "devices"
+    namespace = "deviceshifu"
     
     try:
         # Create fake EdgeDevice
@@ -282,7 +282,7 @@ def test_health_checker():
     
     # Generate unique device name
     device_name = generate_test_device_name()
-    namespace = "devices"
+    namespace = "deviceshifu"
     
     try:
         # Create fake EdgeDevice
@@ -430,7 +430,7 @@ def test_invalid_device():
     # Set environment to non-existent device
     non_existent_device = "non-existent-device-12345"
     os.environ["EDGEDEVICE_NAME"] = non_existent_device
-    os.environ["EDGEDEVICE_NAMESPACE"] = "devices"
+    os.environ["EDGEDEVICE_NAMESPACE"] = "deviceshifu"
     
     # Initialize SDK
     init()

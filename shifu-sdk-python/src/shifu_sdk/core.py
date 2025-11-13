@@ -66,7 +66,7 @@ SHIFU_API_PLURAL = os.getenv("SHIFU_API_PLURAL", "edgedevices")
 def init():
     """Initialize SDK (env + Kubernetes client). [Backward compatibility]"""
     global k8s_client, k8s_core_v1_client, k8s_api_client, edgedevice_namespace, edgedevice_name
-    edgedevice_namespace = os.getenv("EDGEDEVICE_NAMESPACE", "devices")
+    edgedevice_namespace = os.getenv("EDGEDEVICE_NAMESPACE", "deviceshifu")
     edgedevice_name = os.getenv("EDGEDEVICE_NAME")
     SHIFU_API_GROUP = os.getenv("SHIFU_API_GROUP", "shifu.edgenesis.io")
     SHIFU_API_VERSION = os.getenv("SHIFU_API_VERSION", "v1alpha1")

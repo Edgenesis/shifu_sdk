@@ -16,6 +16,11 @@ Minimal, installable Python SDK that provides both **global functions** and **De
 - Python 3.8+
 - Kubernetes cluster access (or local kubeconfig)
 - `kubernetes>=28.1.0` package
+- **Shifu Control Plane**: Install the official [Shifu IoT Gateway](https://github.com/Edgenesis/shifu) in your cluster
+  ```bash
+  kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/install/shifu_install.yml
+  ```
+- **RBAC Permissions**: When using official Shifu, RBAC is automatically configured. For custom setups, see [RBAC_SETUP.md](RBAC_SETUP.md)
 
 ### Install
 ```bash
@@ -36,7 +41,7 @@ python test_configmap_functions.py
 ### Environment Setup
 ```bash
 export EDGEDEVICE_NAME="my-device"
-export EDGEDEVICE_NAMESPACE="devices"  # Optional, defaults to "devices"
+export EDGEDEVICE_NAMESPACE="deviceshifu"  # Optional, defaults to "deviceshifu"
 ```
 
 ### Basic Usage Examples
@@ -137,7 +142,7 @@ Use DeviceShifu class for managing multiple devices with isolated instances.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `EDGEDEVICE_NAME` | Yes | - | Name of your EdgeDevice |
-| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace |
+| `EDGEDEVICE_NAMESPACE` | No | "deviceshifu" | Kubernetes namespace (use "deviceshifu" for official Shifu) |
 | `SHIFU_API_GROUP` | No | "shifu.edgenesis.io" | Kubernetes API group for EdgeDevices |
 | `SHIFU_API_VERSION` | No | "v1alpha1" | Kubernetes API version for EdgeDevices |
 | `SHIFU_API_PLURAL` | No | "edgedevices" | Kubernetes API plural name for EdgeDevices |
@@ -383,8 +388,8 @@ if device:
 
 ### EdgeDevice Management Functions
 - `init()` - Initialize SDK and Kubernetes client
-- `get_edgedevice()` - Get EdgeDevice configuration from Kubernetes
-- `update_phase(phase)` - Update device status phase in Kubernetes
+- `get_edgedevice()` - Get EdgeDevice configuration from Kubernetes API (requires RBAC permissions)
+- `update_phase(phase)` - Update device status phase (requires RBAC permissions)
 - `add_health_checker(checker)` - Register health check function
 - `start()` - Start health monitoring loop (3-second intervals)
 - `get_device_config()` - Get device configuration from EdgeDevice spec
@@ -400,7 +405,7 @@ if device:
 - `get_telemetries(config_dir="/etc/edgedevice/config")` - Get only telemetries from ConfigMap
 
 ### DeviceShifu Class
-- `DeviceShifu(device_name, namespace="devices")` - Create device instance
+- `DeviceShifu(device_name, namespace="deviceshifu")` - Create device instance
 - All EdgeDevice management methods available as instance methods
 - `device.setup_device_shifu(checker)` - Instance-specific setup
 
@@ -439,7 +444,7 @@ Failed to get EdgeDevice
 ```
 **Solution:**
 ```bash
-kubectl get edgedevices -n devices
+kubectl get edgedevices -n deviceshifu
 ```
 
 ### Debug Mode
