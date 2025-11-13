@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deviceshifu-example-device
+  namespace: deviceshifu
+  labels:
+    app: deviceshifu-example-device
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deviceshifu-example-device
+  template:
+    metadata:
+      labels:
+        app: deviceshifu-example-device
+    spec:
+      # Use Shifu's official ServiceAccount (created by shifu_install.yml)
+      serviceAccountName: edgedevice-sa
+      containers:
+      - name: deviceshifu
+        image: deviceshifu-example:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        # Required: EdgeDevice name and namespace
+        - name: EDGEDEVICE_NAME
+          value: "example-device"
+        - name: EDGEDEVICE_NAMESPACE
+          value: "deviceshifu"
+        # Optional: Shifu API configuration
+        - name: SHIFU_API_GROUP
+          value: "shifu.edgenesis.io"
+        - name: SHIFU_API_VERSION
+          value: "v1alpha1"
+        - name: SHIFU_API_PLURAL
+          value: "edgedevices"
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        # Optional: Mount ConfigMap for device configuration
+        # volumeMounts:
+        # - name: device-config
+        #   mountPath: /etc/edgedevice/config
+      # Optional: ConfigMap volume
+      # volumes:
+      # - name: device-config
+      #   configMap:
+      #     name: example-device-config
+
