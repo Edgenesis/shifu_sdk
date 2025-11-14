@@ -24,12 +24,14 @@ jobs:
           cache: 'pip'
 
       - name: Install Python dependencies
+        working-directory: ./shifu-sdk-python
         run: |
           python -m pip install --upgrade pip
           pip install -e .
           pip install pytest pytest-cov
 
       - name: Run unit tests
+        working-directory: ./shifu-sdk-python
         run: |
           echo "Running unit tests..."
           pytest tests/ -v --cov=shifu_sdk --cov-report=term-missing
@@ -68,6 +70,7 @@ jobs:
           kubectl get serviceaccount edgedevice-sa -n deviceshifu
 
       - name: Build SDK Docker image
+        working-directory: ./shifu-sdk-python
         run: |
           echo "Building deviceShifu example Docker image..."
           cd examples
@@ -77,6 +80,7 @@ jobs:
           kind load docker-image deviceshifu-python-sdk:test --name shifu-test
 
       - name: Deploy EdgeDevice
+        working-directory: ./shifu-sdk-python
         run: |
           echo "Creating EdgeDevice CRD..."
           kubectl apply -f examples/k8s/edgedevice.yaml
@@ -86,6 +90,7 @@ jobs:
           kubectl get edgedevice example-device -n deviceshifu -o yaml
 
       - name: Deploy deviceShifu with SDK
+        working-directory: ./shifu-sdk-python
         run: |
           echo "Deploying deviceShifu application..."
           kubectl apply -f examples/k8s/deployment.yaml
@@ -344,6 +349,7 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: ./shifu-sdk-python
         run: |
           echo "Cleaning up test resources..."
           kubectl delete -f examples/k8s/deployment.yaml --ignore-not-found=true || true
