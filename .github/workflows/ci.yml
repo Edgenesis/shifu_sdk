@@ -1,4 +1,4 @@
-name: CI
+name: Test SDK in K8S Cluster
 
 on:
   push:
