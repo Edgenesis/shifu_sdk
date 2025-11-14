@@ -116,16 +116,37 @@ jobs:
           
           echo "Pod is ready!"
           kubectl get pods -n deviceshifu -l app=deviceshifu-example-device
+          
+          # Wait for application to start and begin logging
+          echo "Waiting 10 seconds for application to initialize..."
+          sleep 10
+
+      - name: Verify Container Status
+        run: |
+          echo "Checking container status..."
+          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          
+          # Check if container is running
+          kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].state}'
+          
+          # Check for any restart loops
+          RESTARTS=$(kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].restartCount}')
+          echo "Container restart count: $RESTARTS"
 
       - name: Test SDK Initialization
         run: |
           echo "Test 1: Verify SDK initialized successfully"
-          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=50 | grep "Initializing Shifu SDK" || {
-            echo "❌ SDK initialization failed"
-            kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=100
+          echo "--- Current Pod Logs ---"
+          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=100
+          
+          echo "--- Checking for initialization message ---"
+          if kubectl logs -n deviceshifu -l app=deviceshifu-example-device | grep -q "Initializing Shifu SDK"; then
+            echo "✅ SDK initialized"
+          else
+            echo "❌ SDK initialization message not found"
+            echo "Full logs shown above"
             exit 1
-          }
-          echo "✅ SDK initialized"
+          fi
 
       - name: Test EdgeDevice Reading
         run: |
