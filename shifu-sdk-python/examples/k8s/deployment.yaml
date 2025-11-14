@@ -19,7 +19,7 @@ spec:
       serviceAccountName: edgedevice-sa
       containers:
       - name: deviceshifu
-        image: deviceshifu-example:latest
+        image: deviceshifu-python-sdk:test
         imagePullPolicy: IfNotPresent
         env:
         # Required: EdgeDevice name and namespace
