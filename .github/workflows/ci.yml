@@ -120,7 +120,7 @@ jobs:
       - name: Test SDK Initialization
         run: |
           echo "Test 1: Verify SDK initialized successfully"
-          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=50 | grep "Shifu SDK initialized" || {
+          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=50 | grep "Initializing Shifu SDK" || {
             echo "❌ SDK initialization failed"
             kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=100
             exit 1
