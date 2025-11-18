@@ -2,7 +2,7 @@ apiVersion: shifu.edgenesis.io/v1alpha1
 kind: EdgeDevice
 metadata:
   name: example-device
-  namespace: deviceshifu
+  namespace: devices
 spec:
   sku: "EXAMPLE-001"
   connection: "Ethernet"

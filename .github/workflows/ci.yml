@@ -66,8 +66,15 @@ jobs:
           
           echo "Verifying Shifu installation..."
           kubectl get crd edgedevices.shifu.edgenesis.io
-          kubectl get namespace deviceshifu
-          kubectl get serviceaccount edgedevice-sa -n deviceshifu
+          
+          echo "Creating devices namespace..."
+          kubectl create namespace devices || true
+          
+          echo "Creating RBAC for devices namespace..."
+          kubectl create serviceaccount edgedevice-sa -n devices || true
+          kubectl create clusterrolebinding edgedevice-sa-binding \
+            --clusterrole=cluster-admin \
+            --serviceaccount=devices:edgedevice-sa || true
 
       - name: Build SDK Docker image
         working-directory: ./shifu-sdk-python
@@ -87,7 +94,7 @@ jobs:
           
           echo "Waiting for EdgeDevice to be created..."
           sleep 5
-          kubectl get edgedevice example-device -n deviceshifu -o yaml
+          kubectl get edgedevice example-device -n devices -o yaml
 
       - name: Run EdgeDevice unit tests
         working-directory: ./shifu-sdk-python
@@ -106,16 +113,16 @@ jobs:
           
           echo "Waiting for pod to be ready..."
           kubectl wait --for=condition=ready --timeout=120s \
-            pod -l app=deviceshifu-example-device -n deviceshifu || {
+            pod -l app=deviceshifu-example-device -n devices || {
             echo "Pod failed to start. Checking status..."
-            kubectl get pods -n deviceshifu
-            kubectl describe pods -n deviceshifu -l app=deviceshifu-example-device
-            kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=100 || true
+            kubectl get pods -n devices
+            kubectl describe pods -n devices -l app=deviceshifu-example-device
+            kubectl logs -n devices -l app=deviceshifu-example-device --tail=100 || true
             exit 1
           }
           
           echo "Pod is ready!"
-          kubectl get pods -n deviceshifu -l app=deviceshifu-example-device
+          kubectl get pods -n devices -l app=deviceshifu-example-device
           
           # Wait for application to start and begin logging
           echo "Waiting 10 seconds for application to initialize..."
@@ -124,13 +131,13 @@ jobs:
       - name: Verify Container Status
         run: |
           echo "Checking container status..."
-          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          POD_NAME=$(kubectl get pod -n devices -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
           
           # Check if container is running
-          kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].state}'
+          kubectl get pod $POD_NAME -n devices -o jsonpath='{.status.containerStatuses[0].state}'
           
           # Check for any restart loops
-          RESTARTS=$(kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].restartCount}')
+          RESTARTS=$(kubectl get pod $POD_NAME -n devices -o jsonpath='{.status.containerStatuses[0].restartCount}')
           echo "Container restart count: $RESTARTS"
 
       - name: Test SDK Functionality
@@ -139,12 +146,12 @@ jobs:
           
           # Show logs for debugging
           echo "--- Application Logs ---"
-          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=50
+          kubectl logs -n devices -l app=deviceshifu-example-device --tail=50
           echo ""
           
           # Test 1: Verify logs exist (application started)
           echo "Test 1: Checking if application is producing logs..."
-          LOG_COUNT=$(kubectl logs -n deviceshifu -l app=deviceshifu-example-device 2>/dev/null | wc -l)
+          LOG_COUNT=$(kubectl logs -n devices -l app=deviceshifu-example-device 2>/dev/null | wc -l)
           if [ "$LOG_COUNT" -gt 0 ]; then
             echo "✅ Application is running and logging ($LOG_COUNT log lines)"
           else
@@ -154,8 +161,8 @@ jobs:
           
           # Test 2: Verify pod is stable (no crashes)
           echo "Test 2: Checking pod stability..."
-          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
-          RESTARTS=$(kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].restartCount}')
+          POD_NAME=$(kubectl get pod -n devices -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          RESTARTS=$(kubectl get pod $POD_NAME -n devices -o jsonpath='{.status.containerStatuses[0].restartCount}')
           if [ "$RESTARTS" -eq 0 ]; then
             echo "✅ Pod is stable (0 restarts)"
           else
@@ -165,12 +172,12 @@ jobs:
           
           # Test 3: Verify EdgeDevice phase was updated by SDK
           echo "Test 3: Checking if SDK updated EdgeDevice status..."
-          PHASE=$(kubectl get edgedevice example-device -n deviceshifu -o jsonpath='{.status.edgedevicephase}')
+          PHASE=$(kubectl get edgedevice example-device -n devices -o jsonpath='{.status.edgedevicephase}')
           if [ "$PHASE" = "Running" ]; then
             echo "✅ SDK successfully updated EdgeDevice phase to: $PHASE"
           else
             echo "❌ EdgeDevice phase is: $PHASE (expected: Running)"
-            kubectl get edgedevice example-device -n deviceshifu -o yaml
+            kubectl get edgedevice example-device -n devices -o yaml
             exit 1
           fi
           
@@ -184,7 +191,7 @@ jobs:
           sleep 35  # Wait for at least one health check cycle (30s interval)
           
           # Verify EdgeDevice phase is still Running (health checks maintaining it)
-          PHASE=$(kubectl get edgedevice example-device -n deviceshifu -o jsonpath='{.status.edgedevicephase}')
+          PHASE=$(kubectl get edgedevice example-device -n devices -o jsonpath='{.status.edgedevicephase}')
           if [ "$PHASE" = "Running" ]; then
             echo "✅ Health monitoring is active - EdgeDevice phase maintained at: $PHASE"
           else
@@ -193,8 +200,8 @@ jobs:
           fi
           
           # Verify pod is still running without restarts
-          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
-          RESTARTS=$(kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.containerStatuses[0].restartCount}')
+          POD_NAME=$(kubectl get pod -n devices -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          RESTARTS=$(kubectl get pod $POD_NAME -n devices -o jsonpath='{.status.containerStatuses[0].restartCount}')
           if [ "$RESTARTS" -eq 0 ]; then
             echo "✅ Health check loop stable - no crashes (0 restarts)"
           else
@@ -205,15 +212,15 @@ jobs:
       - name: Test RBAC Permissions
         run: |
           echo "Test 5: Verify RBAC permissions"
-          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          POD_NAME=$(kubectl get pod -n devices -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
           
           # Test GET permission
-          kubectl exec -n deviceshifu $POD_NAME -- python3 -c "
+          kubectl exec -n devices $POD_NAME -- python3 -c "
           from kubernetes import client, config
           config.load_incluster_config()
           api = client.CustomObjectsApi()
           try:
-              api.get_namespaced_custom_object('shifu.edgenesis.io', 'v1alpha1', 'deviceshifu', 'edgedevices', 'example-device')
+              api.get_namespaced_custom_object('shifu.edgenesis.io', 'v1alpha1', 'devices', 'edgedevices', 'example-device')
               print('GET: OK')
           except Exception as e:
               print(f'GET: FAILED - {e}')
@@ -230,16 +237,16 @@ jobs:
           echo "Test 6: Test dynamic EdgeDevice updates"
           
           # Get initial address
-          INITIAL_ADDR=$(kubectl get edgedevice example-device -n deviceshifu -o jsonpath='{.spec.address}')
+          INITIAL_ADDR=$(kubectl get edgedevice example-device -n devices -o jsonpath='{.spec.address}')
           echo "Initial address: $INITIAL_ADDR"
           
           # Update address
           echo "Updating EdgeDevice address to 192.168.1.200:9090..."
-          kubectl patch edgedevice example-device -n deviceshifu --type=merge \
+          kubectl patch edgedevice example-device -n devices --type=merge \
             -p '{"spec":{"address":"192.168.1.200:9090"}}'
           
           # Verify the update was applied
-          UPDATED_ADDR=$(kubectl get edgedevice example-device -n deviceshifu -o jsonpath='{.spec.address}')
+          UPDATED_ADDR=$(kubectl get edgedevice example-device -n devices -o jsonpath='{.spec.address}')
           if [ "$UPDATED_ADDR" = "192.168.1.200:9090" ]; then
             echo "✅ EdgeDevice spec updated successfully"
           else
@@ -252,8 +259,8 @@ jobs:
           sleep 35
           
           # Verify pod is still running after the update
-          POD_NAME=$(kubectl get pod -n deviceshifu -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
-          POD_STATUS=$(kubectl get pod $POD_NAME -n deviceshifu -o jsonpath='{.status.phase}')
+          POD_NAME=$(kubectl get pod -n devices -l app=deviceshifu-example-device -o jsonpath='{.items[0].metadata.name}')
+          POD_STATUS=$(kubectl get pod $POD_NAME -n devices -o jsonpath='{.status.phase}')
           if [ "$POD_STATUS" = "Running" ]; then
             echo "✅ SDK handled dynamic update gracefully - pod still Running"
           else
@@ -272,14 +279,14 @@ jobs:
           kubectl logs -n shifu-crd-system -l control-plane=controller-manager --tail=100 || true
           
           echo -e "\n--- EdgeDevice Status ---"
-          kubectl get edgedevice example-device -n deviceshifu -o yaml || true
+          kubectl get edgedevice example-device -n devices -o yaml || true
           
           echo -e "\n--- DeviceShifu Pod Status ---"
-          kubectl get pods -n deviceshifu -l app=deviceshifu-example-device || true
-          kubectl describe pods -n deviceshifu -l app=deviceshifu-example-device || true
+          kubectl get pods -n devices -l app=deviceshifu-example-device || true
+          kubectl describe pods -n devices -l app=deviceshifu-example-device || true
           
           echo -e "\n--- DeviceShifu Logs ---"
-          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=200 || true
+          kubectl logs -n devices -l app=deviceshifu-example-device --tail=200 || true
           
           echo -e "\n--- All Namespaces ---"
           kubectl get all -A || true
@@ -292,16 +299,16 @@ jobs:
           
           # Verify EdgeDevice final state
           echo "EdgeDevice Final State:"
-          kubectl get edgedevice example-device -n deviceshifu -o jsonpath='{.status.edgedevicephase}' && echo ""
+          kubectl get edgedevice example-device -n devices -o jsonpath='{.status.edgedevicephase}' && echo ""
           
           # Verify pod is still running
           echo "Pod Status:"
-          kubectl get pod -n deviceshifu -l app=deviceshifu-example-device
+          kubectl get pod -n devices -l app=deviceshifu-example-device
           
           # Show final logs
           echo ""
           echo "Application Logs (last 20 lines):"
-          kubectl logs -n deviceshifu -l app=deviceshifu-example-device --tail=20
+          kubectl logs -n devices -l app=deviceshifu-example-device --tail=20
           
           echo ""
           echo "✅ All integration tests completed successfully!"

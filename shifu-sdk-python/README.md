@@ -41,7 +41,7 @@ python test_configmap_functions.py
 ### Environment Setup
 ```bash
 export EDGEDEVICE_NAME="my-device"
-export EDGEDEVICE_NAMESPACE="deviceshifu"  # Optional, defaults to "deviceshifu"
+export EDGEDEVICE_NAMESPACE="devices"  # Optional, defaults to "devices"
 ```
 
 ### Basic Usage Examples
@@ -142,7 +142,7 @@ Use DeviceShifu class for managing multiple devices with isolated instances.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `EDGEDEVICE_NAME` | Yes | - | Name of your EdgeDevice |
-| `EDGEDEVICE_NAMESPACE` | No | "deviceshifu" | Kubernetes namespace (use "deviceshifu" for official Shifu) |
+| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace (use "devices" for device resources) |
 | `SHIFU_API_GROUP` | No | "shifu.edgenesis.io" | Kubernetes API group for EdgeDevices |
 | `SHIFU_API_VERSION` | No | "v1alpha1" | Kubernetes API version for EdgeDevices |
 | `SHIFU_API_PLURAL` | No | "edgedevices" | Kubernetes API plural name for EdgeDevices |
@@ -157,7 +157,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: my-device-configmap
-  namespace: deviceshifu
+  namespace: devices
 data:
   driverProperties: |
     driverSku: "SENSOR-001"
@@ -405,7 +405,7 @@ if device:
 - `get_telemetries(config_dir="/etc/edgedevice/config")` - Get only telemetries from ConfigMap
 
 ### DeviceShifu Class
-- `DeviceShifu(device_name, namespace="deviceshifu")` - Create device instance
+- `DeviceShifu(device_name, namespace="devices")` - Create device instance
 - All EdgeDevice management methods available as instance methods
 - `device.setup_device_shifu(checker)` - Instance-specific setup
 
@@ -444,7 +444,7 @@ Failed to get EdgeDevice
 ```
 **Solution:**
 ```bash
-kubectl get edgedevices -n deviceshifu
+kubectl get edgedevices -n devices
 ```
 
 ### Debug Mode
