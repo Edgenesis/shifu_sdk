@@ -20,7 +20,7 @@ spec:
       containers:
       - name: deviceshifu
         image: deviceshifu-python-sdk:test
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         env:
         # Required: EdgeDevice name and namespace
         - name: EDGEDEVICE_NAME

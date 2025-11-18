@@ -37,10 +37,9 @@ jobs:
           pytest tests/test_configmap_functions.py -v --cov=shifu_sdk --cov-report=term-missing
 
       - name: Set up Kubernetes (kind)
-        uses: helm/kind-action@v1.10.0
+        uses: helm/kind-action@v1.13.0
         with:
           cluster_name: shifu-test
-          kubectl_version: v1.28.0
           wait: 120s
 
       - name: Verify Kubernetes cluster
@@ -52,7 +51,7 @@ jobs:
       - name: Install Shifu Control Plane
         run: |
           echo "Installing Shifu using official installation script..."
-          kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/install/shifu_install.yml
+          kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/v0.83.0/pkg/k8s/crd/install/shifu_install.yml
           
           echo "Waiting for Shifu controller to be ready..."
           kubectl wait --for=condition=available --timeout=180s \
@@ -67,14 +66,23 @@ jobs:
           echo "Verifying Shifu installation..."
           kubectl get crd edgedevices.shifu.edgenesis.io
           
-          echo "Creating devices namespace..."
-          kubectl create namespace devices || true
+          echo "Checking if devices namespace exists..."
+          if ! kubectl get namespace devices &>/dev/null; then
+            echo "❌ ERROR: 'devices' namespace not found!"
+            echo "Shifu installation should have created this namespace."
+            echo "Please check your Shifu installation."
+            exit 1
+          fi
+          echo "✅ devices namespace exists"
           
-          echo "Creating RBAC for devices namespace..."
-          kubectl create serviceaccount edgedevice-sa -n devices || true
-          kubectl create clusterrolebinding edgedevice-sa-binding \
-            --clusterrole=cluster-admin \
-            --serviceaccount=devices:edgedevice-sa || true
+          echo "Checking if edgedevice-sa ServiceAccount exists..."
+          if ! kubectl get serviceaccount edgedevice-sa -n devices &>/dev/null; then
+            echo "❌ ERROR: 'edgedevice-sa' ServiceAccount not found in devices namespace!"
+            echo "Shifu installation should have created this ServiceAccount."
+            echo "Please check your Shifu installation."
+            exit 1
+          fi
+          echo "✅ edgedevice-sa ServiceAccount exists"
 
       - name: Build SDK Docker image
         working-directory: ./shifu-sdk-python
