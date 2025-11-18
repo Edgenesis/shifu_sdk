@@ -20,7 +20,10 @@ Minimal, installable Python SDK that provides both **global functions** and **De
   ```bash
   kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/install/shifu_install.yml
   ```
-- **RBAC Permissions**: When using official Shifu, RBAC is automatically configured. For custom setups, see [RBAC_SETUP.md](RBAC_SETUP.md)
+  This creates two namespaces:
+  - `devices`: For EdgeDevice CRD instances (control plane / status)
+  - `deviceshifu`: For device driver pods (data plane / your applications)
+- **RBAC Permissions**: When using official Shifu, RBAC is automatically configured with `edgedevice-sa` ServiceAccount in the `deviceshifu` namespace. For custom setups, see [RBAC_SETUP.md](RBAC_SETUP.md)
 
 ### Install
 ```bash
@@ -142,7 +145,7 @@ Use DeviceShifu class for managing multiple devices with isolated instances.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `EDGEDEVICE_NAME` | Yes | - | Name of your EdgeDevice |
-| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace (use "devices" for device resources) |
+| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace where EdgeDevice CRDs are located |
 | `SHIFU_API_GROUP` | No | "shifu.edgenesis.io" | Kubernetes API group for EdgeDevices |
 | `SHIFU_API_VERSION` | No | "v1alpha1" | Kubernetes API version for EdgeDevices |
 | `SHIFU_API_PLURAL` | No | "edgedevices" | Kubernetes API plural name for EdgeDevices |
@@ -444,7 +447,8 @@ Failed to get EdgeDevice
 ```
 **Solution:**
 ```bash
-kubectl get edgedevices -n devices
+kubectl get edgedevices -n devices  # EdgeDevice CRDs are in devices namespace
+kubectl get pods -n deviceshifu     # Device driver pods are in deviceshifu namespace
 ```
 
 ### Debug Mode

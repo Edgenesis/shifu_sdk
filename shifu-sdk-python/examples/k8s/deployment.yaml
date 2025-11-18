@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deviceshifu-example-device
-  namespace: devices
+  namespace: deviceshifu
   labels:
     app: deviceshifu-example-device
 spec:
