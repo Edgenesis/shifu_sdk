@@ -76,7 +76,7 @@ jobs:
           echo "✅ devices namespace exists"
           
           echo "Checking if edgedevice-sa ServiceAccount exists..."
-          if ! kubectl get serviceaccount edgedevice-sa -n devices &>/dev/null; then
+          if ! kubectl get serviceaccount edgedevice-sa -n deviceshifu &>/dev/null; then
             echo "❌ ERROR: 'edgedevice-sa' ServiceAccount not found in devices namespace!"
             echo "Shifu installation should have created this ServiceAccount."
             echo "Please check your Shifu installation."
