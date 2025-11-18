@@ -123,22 +123,9 @@ jobs:
         working-directory: ./shifu-sdk-python
         run: |
           echo "Deploying deviceShifu application..."
-          
-          echo "Contents of deployment.yaml (first 20 lines):"
-          cat examples/k8s/deployment.yaml | head -20
-          echo ""
-          
           kubectl apply -f examples/k8s/deployment.yaml
-          
-          echo "Waiting 3 seconds for resources to be created..."
           sleep 3
-          
-          echo ""
-          echo "Searching for deployment in ALL namespaces..."
-          kubectl get deployment --all-namespaces | grep deviceshifu || echo "Not found in any namespace"
-          
-          echo ""
-          echo "Verifying deployment in deviceshifu namespace..."
+          echo "Verifying deployment created..."
           kubectl get deployment deviceshifu-example-device -n deviceshifu
           
           echo "Waiting for deployment to create pod..."
