@@ -16,6 +16,14 @@ Minimal, installable Python SDK that provides both **global functions** and **De
 - Python 3.8+
 - Kubernetes cluster access (or local kubeconfig)
 - `kubernetes>=28.1.0` package
+- **Shifu Control Plane**: Install the official [Shifu IoT Gateway](https://github.com/Edgenesis/shifu) in your cluster
+  ```bash
+  kubectl apply -f https://raw.githubusercontent.com/Edgenesis/shifu/main/pkg/k8s/crd/install/shifu_install.yml
+  ```
+  This creates two namespaces:
+  - `devices`: For EdgeDevice CRD instances (control plane / status)
+  - `deviceshifu`: For device driver pods (data plane / your applications)
+- **RBAC Permissions**: When using official Shifu, RBAC is automatically configured with `edgedevice-sa` ServiceAccount in the `deviceshifu` namespace. For custom setups, see [RBAC_SETUP.md](RBAC_SETUP.md)
 
 ### Install
 ```bash
@@ -137,7 +145,7 @@ Use DeviceShifu class for managing multiple devices with isolated instances.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `EDGEDEVICE_NAME` | Yes | - | Name of your EdgeDevice |
-| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace |
+| `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace where EdgeDevice CRDs are located |
 | `SHIFU_API_GROUP` | No | "shifu.edgenesis.io" | Kubernetes API group for EdgeDevices |
 | `SHIFU_API_VERSION` | No | "v1alpha1" | Kubernetes API version for EdgeDevices |
 | `SHIFU_API_PLURAL` | No | "edgedevices" | Kubernetes API plural name for EdgeDevices |
@@ -152,7 +160,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: my-device-configmap
-  namespace: deviceshifu
+  namespace: devices
 data:
   driverProperties: |
     driverSku: "SENSOR-001"
@@ -383,8 +391,8 @@ if device:
 
 ### EdgeDevice Management Functions
 - `init()` - Initialize SDK and Kubernetes client
-- `get_edgedevice()` - Get EdgeDevice configuration from Kubernetes
-- `update_phase(phase)` - Update device status phase in Kubernetes
+- `get_edgedevice()` - Get EdgeDevice configuration from Kubernetes API (requires RBAC permissions)
+- `update_phase(phase)` - Update device status phase (requires RBAC permissions)
 - `add_health_checker(checker)` - Register health check function
 - `start()` - Start health monitoring loop (3-second intervals)
 - `get_device_config()` - Get device configuration from EdgeDevice spec
@@ -439,7 +447,8 @@ Failed to get EdgeDevice
 ```
 **Solution:**
 ```bash
-kubectl get edgedevices -n devices
+kubectl get edgedevices -n devices  # EdgeDevice CRDs are in devices namespace
+kubectl get pods -n deviceshifu     # Device driver pods are in deviceshifu namespace
 ```
 
 ### Debug Mode

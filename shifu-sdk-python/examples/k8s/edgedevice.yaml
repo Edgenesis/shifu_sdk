@@ -1,0 +1,13 @@
+apiVersion: shifu.edgenesis.io/v1alpha1
+kind: EdgeDevice
+metadata:
+  name: example-device
+  namespace: devices
+spec:
+  sku: "EXAMPLE-001"
+  connection: "Ethernet"
+  address: "192.168.1.100:8080"
+  protocol: "HTTP"
+status:
+  edgedevicephase: "Pending"
+
