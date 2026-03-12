@@ -8,7 +8,6 @@ Minimal, production-ready Go SDK that provides a **Client-based API** for managi
 - 🔧 **Kubernetes Integration**: Automatic EdgeDevice status management
 - 📊 **Health Monitoring**: Continuous device health checking and reporting
 - 🎯 **Flexible Configuration**: Support for different namespaces and device types
-- 🧪 **High Test Coverage**: 78.9% test coverage with comprehensive test suite
 - 🚀 **Production Ready**: Used in real-world IoT deployments
 
 ## Installation
@@ -691,23 +690,6 @@ func TestMyFunction(t *testing.T) {
     // Test your code
 }
 ```
-
-## Migration Guide
-
-**Recommended pattern:**
-```go
-client, _ := shifusdk.NewClient(ctx, &shifusdk.Config{
-    HealthChecker: myHealthChecker,
-})
-client.Start(ctx)
-```
-
-### Benefits of Migration
-- ✅ Better testability with dependency injection
-- ✅ Multiple device management
-- ✅ No global state
-- ✅ Explicit error handling
-- ✅ Better IDE support and type safety
 
 ## Support
 
