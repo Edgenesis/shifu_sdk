@@ -735,57 +735,6 @@ func TestGetConfigMapTyped(t *testing.T) {
 	}
 }
 
-// Tests for deprecated functions
-
-func TestDeprecated_GetEdgedevice(t *testing.T) {
-	if globalClient == nil {
-		t.Skip("Global client not initialized")
-	}
-
-	// Just test that it doesn't panic
-	_, _ = GetEdgedevice()
-}
-
-func TestDeprecated_UpdatePhase(t *testing.T) {
-	if globalClient == nil {
-		t.Skip("Global client not initialized")
-	}
-
-	// Just test that it doesn't panic
-	_ = UpdatePhase(v1alpha1.EdgeDevicePending)
-}
-
-func TestDeprecated_Start(t *testing.T) {
-	if globalClient == nil {
-		t.Skip("Global client not initialized")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
-
-	// Just test that it doesn't panic
-	Start(ctx)
-}
-
-func TestDeprecated_GetConfigMap(t *testing.T) {
-	result, err := GetConfigMap[TestProtocolPropertyList]()
-	if err != nil {
-		t.Fatalf("GetConfigMap() error = %v", err)
-	}
-	if result == nil {
-		t.Error("GetConfigMap() returned nil")
-	}
-}
-
-func TestDeprecated_AddHealthChecker(t *testing.T) {
-	testFunc := func() v1alpha1.EdgeDevicePhase {
-		return v1alpha1.EdgeDevicePending
-	}
-
-	// Just test that it doesn't panic
-	AddHealthChecker(testFunc)
-}
-
 // Tests for struct types
 
 func TestDeviceShifuConfigUnmarshal(t *testing.T) {

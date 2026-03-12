@@ -1,6 +1,6 @@
 # Shifu SDK — Go SDK for IoT Device Management
 
-Minimal, production-ready Go SDK that provides both **global functions** (deprecated) and **Client-based API** for managing IoT devices in the Shifu framework.
+Minimal, production-ready Go SDK that provides a **Client-based API** for managing IoT devices in the Shifu framework.
 
 ## Features
 
@@ -10,7 +10,6 @@ Minimal, production-ready Go SDK that provides both **global functions** (deprec
 - 🎯 **Flexible Configuration**: Support for different namespaces and device types
 - 🧪 **High Test Coverage**: 78.9% test coverage with comprehensive test suite
 - 🚀 **Production Ready**: Used in real-world IoT deployments
-- 🔄 **Backward Compatible**: Legacy global functions still supported (deprecated)
 
 ## Installation
 
@@ -260,7 +259,7 @@ func main() {
 | `EDGEDEVICE_NAMESPACE` | No | "devices" | Kubernetes namespace |
 | `KUBECONFIG` | No | - | Path to kubeconfig (uses in-cluster config if not set) |
 
-*Required when using `NewClientFromEnv()` or deprecated global functions
+*Required when using `NewClientFromEnv()`
 
 ### Client Configuration Options
 
@@ -597,14 +596,6 @@ type DeviceShifuDriverProperties struct {
 type HealthChecker func() v1alpha1.EdgeDevicePhase
 ```
 
-### Deprecated Global Functions
-These functions are maintained for backward compatibility but are deprecated:
-- `Start(ctx context.Context)` - **Deprecated**: Use `Client.Start()` instead
-- `GetEdgedevice() (*v1alpha1.EdgeDevice, error)` - **Deprecated**: Use `Client.GetEdgeDevice()` instead
-- `UpdatePhase(phase v1alpha1.EdgeDevicePhase) error` - **Deprecated**: Use `Client.UpdatePhase()` instead
-- `GetConfigMap[T any]() (*DeviceShifuConfig[T], error)` - **Deprecated**: Use `GetConfigMapTyped[T](client)` instead
-- `AddHealthChecker(fn func() v1alpha1.EdgeDevicePhase)` - **Deprecated**: Use `Client.SetHealthChecker()` instead
-
 ## Troubleshooting
 
 ### Common Issues
@@ -703,15 +694,7 @@ func TestMyFunction(t *testing.T) {
 
 ## Migration Guide
 
-### Migrating from Global Functions to Client API
-
-**Before (Deprecated):**
-```go
-shifusdk.AddHealthChecker(myHealthChecker)
-shifusdk.Start(ctx)
-```
-
-**After (Recommended):**
+**Recommended pattern:**
 ```go
 client, _ := shifusdk.NewClient(ctx, &shifusdk.Config{
     HealthChecker: myHealthChecker,
