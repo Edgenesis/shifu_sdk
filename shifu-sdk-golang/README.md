@@ -14,7 +14,7 @@ Minimal, production-ready Go SDK that provides a **Client-based API** for managi
 ## Installation
 
 ### Prerequisites
-- Go 1.26.1 for shifusdk
+- Golang 1.26.1 for shifusdk
 - Kubernetes cluster access (or local kubeconfig)
 - Access to Shifu EdgeDevice CRDs
 

@@ -31,6 +31,7 @@ Works with various device types, protocols, and deployment scenarios - from sing
 Shifu SDK is available in multiple programming languages to fit your development environment:
 
 - **[Python SDK](./shifu-sdk-python/)**
+- **[Golang SDK](./shifu-sdk-golang/)** (requires Golang 1.26.1 for `shifusdk`)
 - More language implementations coming soon!
 
 Each SDK provides the same core capabilities while following the conventions and best practices of its respective language ecosystem.
@@ -57,4 +58,3 @@ Visit the individual SDK directories for detailed documentation specific to each
 ---
 
 **Built for developers who want to focus on innovation, not infrastructure.**
-
