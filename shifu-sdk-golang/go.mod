@@ -1,6 +1,6 @@
 module github.com/Edgenesis/shifu_sdk/shifu-sdk-golang
 
-go 1.24.2
+go 1.26.1
 
 require (
 	github.com/edgenesis/shifu v0.81.0
