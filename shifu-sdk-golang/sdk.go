@@ -196,6 +196,10 @@ func (c *Client) GetEdgeDevice() (*v1alpha1.EdgeDevice, error) {
 }
 
 func (c *Client) getEdgeDevice(ctx context.Context) (*v1alpha1.EdgeDevice, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if c.restClient == nil {
 		return nil, fmt.Errorf("rest client is not initialized")
 	}
