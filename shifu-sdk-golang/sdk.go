@@ -46,6 +46,7 @@ type Client struct {
 	configPath          string
 	healthCheckInterval time.Duration
 	configLoader        ConfigLoader
+	ctx                 context.Context
 }
 
 // Config holds configuration for creating a new Client
@@ -100,6 +101,10 @@ func (d *defaultConfigLoader) LoadInstructions(path string) (*DeviceShifuInstruc
 
 // NewClient creates a new Shifu SDK client with the given configuration
 func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if cfg == nil {
 		cfg = &Config{}
 	}
@@ -141,6 +146,7 @@ func NewClient(ctx context.Context, cfg *Config) (*Client, error) {
 		configPath:          cfg.ConfigPath,
 		healthCheckInterval: cfg.HealthCheckInterval,
 		configLoader:        &defaultConfigLoader{},
+		ctx:                 ctx,
 	}
 
 	logger.Infof("Edge device rest client initialized successfully")
@@ -154,6 +160,10 @@ func NewClientFromEnv(ctx context.Context) (*Client, error) {
 
 // Start begins the health check loop
 func (c *Client) Start(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if c.restClient == nil {
 		return fmt.Errorf("edge device rest client is not initialized")
 	}
@@ -171,7 +181,7 @@ func (c *Client) Start(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			phase := c.healthChecker()
-			if err := c.UpdatePhase(phase); err != nil {
+			if err := c.updatePhase(ctx, phase); err != nil {
 				logger.Errorf("failed to update edge device phase: %v", err)
 			}
 		case <-ctx.Done():
@@ -182,6 +192,10 @@ func (c *Client) Start(ctx context.Context) error {
 
 // GetEdgeDevice retrieves the EdgeDevice resource
 func (c *Client) GetEdgeDevice() (*v1alpha1.EdgeDevice, error) {
+	return c.getEdgeDevice(c.ctx)
+}
+
+func (c *Client) getEdgeDevice(ctx context.Context) (*v1alpha1.EdgeDevice, error) {
 	if c.restClient == nil {
 		return nil, fmt.Errorf("rest client is not initialized")
 	}
@@ -191,7 +205,7 @@ func (c *Client) GetEdgeDevice() (*v1alpha1.EdgeDevice, error) {
 		Namespace(c.edgedeviceNamespace).
 		Resource("edgedevices").
 		Name(c.edgedeviceName).
-		Do(context.TODO()).
+		Do(ctx).
 		Into(ed)
 	if err != nil {
 		logger.Errorf("Error GET EdgeDevice resource: %v", err)
@@ -202,11 +216,19 @@ func (c *Client) GetEdgeDevice() (*v1alpha1.EdgeDevice, error) {
 
 // UpdatePhase updates the EdgeDevice phase
 func (c *Client) UpdatePhase(phase v1alpha1.EdgeDevicePhase) error {
+	return c.updatePhase(c.ctx, phase)
+}
+
+func (c *Client) updatePhase(ctx context.Context, phase v1alpha1.EdgeDevicePhase) error {
 	if c.restClient == nil {
 		return fmt.Errorf("rest client is not initialized")
 	}
 
-	ed, err := c.GetEdgeDevice()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	ed, err := c.getEdgeDevice(ctx)
 	if err != nil {
 		return err
 	}
@@ -225,7 +247,7 @@ func (c *Client) UpdatePhase(phase v1alpha1.EdgeDevicePhase) error {
 		Resource("edgedevices").
 		Name(c.edgedeviceName).
 		Body(ed).
-		Do(context.TODO()).
+		Do(ctx).
 		Error()
 	if err != nil {
 		logger.Errorf("Error PUT EdgeDevice resource: %v", err)
@@ -245,8 +267,15 @@ func (c *Client) GetConfigMap() (*DeviceShifuConfig[any], error) {
 		}
 	}
 
+	driverProperties, err := loadDriverPropertiesFromFile(c.configPath + "/driverProperties")
+	if err != nil {
+		log.Printf("Warning: Failed to load driver properties from configmap file: %v", err)
+		driverProperties = &DeviceShifuDriverProperties{}
+	}
+
 	return &DeviceShifuConfig[any]{
-		Instructions: *instructions,
+		DriverProperties: *driverProperties,
+		Instructions:     *instructions,
 	}, nil
 }
 
@@ -260,8 +289,15 @@ func GetConfigMapTyped[T any](c *Client) (*DeviceShifuConfig[T], error) {
 		}
 	}
 
+	driverProperties, err := loadDriverPropertiesFromFile(c.configPath + "/driverProperties")
+	if err != nil {
+		log.Printf("Warning: Failed to load driver properties from configmap file: %v", err)
+		driverProperties = &DeviceShifuDriverProperties{}
+	}
+
 	return &DeviceShifuConfig[T]{
-		Instructions: *instructions,
+		DriverProperties: *driverProperties,
+		Instructions:     *instructions,
 	}, nil
 }
 
@@ -289,6 +325,22 @@ func loadInstructionsFromFile[T any](filePath string) (*DeviceShifuInstructions[
 
 	log.Printf("Loaded %d instructions from configmap file", len(instructions.Instructions))
 	return &instructions, nil
+}
+
+// loadDriverPropertiesFromFile loads driver properties from a file
+func loadDriverPropertiesFromFile(filePath string) (*DeviceShifuDriverProperties, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read driverProperties file: %w", err)
+	}
+
+	var driverProperties DeviceShifuDriverProperties
+	if err := yaml.Unmarshal(data, &driverProperties); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal driver properties: %w", err)
+	}
+
+	log.Printf("Loaded driver properties from configmap file")
+	return &driverProperties, nil
 }
 
 // newEdgeDeviceRestClient creates a REST client for EdgeDevice resources
